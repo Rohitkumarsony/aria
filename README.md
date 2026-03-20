@@ -382,9 +382,8 @@ Python eval() would execute arbitrary code. The AST walker only permits whitelis
 
 
 
-
-**Note**
 ---
+## Note ##
 # Intent-Based Routing Model for Assistant Responses
 
 This document describes how the assistant decides when to use uploaded document context, web search, calculator tools, or built-in LLM knowledge.
