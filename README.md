@@ -384,5 +384,162 @@ Python eval() would execute arbitrary code. The AST walker only permits whitelis
 
 
 **Note**
-![alt text](image.png)
-![alt text](image-1.png)
+---
+# Intent-Based Routing Model for Assistant Responses
+
+This document describes how the assistant decides when to use uploaded document context, web search, calculator tools, or built-in LLM knowledge.
+
+## Client-Facing Model Summary
+
+Our assistant follows an intent-first response model. It first checks whether the user's query can be answered from uploaded documents; if relevant document context exists, it answers from that context with citations. If the document context is missing, incomplete, or not sufficient for a reliable answer, it decides whether external freshness is required. For queries involving current or changing information such as news, weather, sports, prices, public figures, schedules, or recent events, it invokes web search. For numerical computation, formulas, percentages, interest, conversions, or explicit math expressions, it invokes the calculator tool. For conversational queries, explanations, rewriting, summarization, brainstorming, or stable general knowledge that does not require live verification, it answers directly using the language model’s built-in knowledge. This design avoids unnecessary tool calls, keeps responses natural, and uses tools only when they improve accuracy, freshness, or precision.
+
+## Source Priority
+
+The assistant should use sources in this order:
+
+1. **Uploaded document context** when the question is about user-provided files or internal content.
+2. **Web search** when the answer depends on live, recent, or changing information.
+3. **Calculator** when the task requires exact computation.
+4. **Built-in LLM knowledge** for stable general knowledge, reasoning, rewriting, summarization, and conversational help.
+
+## When to Use Each Source
+
+### 1. Document Context
+
+Use document context when:
+
+* the user asks about uploaded files
+* the answer should come from PDFs, docs, manuals, or company documents
+* citations from the document are needed
+* the query is clearly grounded in provided material
+
+### 2. Web Search
+
+Use web search when:
+
+* the answer needs current information
+* the topic may have changed recently
+* the user asks about news, weather, sports, prices, public figures, schedules, regulations, releases, or recent events
+
+### 3. Calculator
+
+Use calculator when:
+
+* the user asks for arithmetic
+* the task includes percentages, formulas, ratios, interest, conversions, or exact numeric evaluation
+* precision matters more than natural language estimation
+
+### 4. Built-in LLM Knowledge
+
+Use built-in knowledge when:
+
+* the question is general and stable
+* the user wants explanation, rewriting, summarization, comparison, brainstorming, or drafting help
+* no document grounding is required
+* no live verification is required
+* no exact computation is required
+
+## Why the LLM Should Not Be Fully Restricted
+
+The assistant should not be completely restricted from using built-in knowledge.
+
+### Reasons
+
+* Many user requests do not require tools, such as rewriting, summarizing, explaining concepts, drafting messages, or brainstorming.
+* Full restriction makes the assistant feel robotic and overly dependent on tools.
+* It can trigger unnecessary web searches for simple, stable questions.
+* If document retrieval misses useful information, the assistant may wrongly fail instead of still helping with general knowledge.
+* Conversational quality becomes worse when every answer must come from a tool.
+
+### Recommended Approach
+
+Use a grounded-first architecture:
+
+* **Documents first** when relevant
+* **Web search** for freshness
+* **Calculator** for exact math
+* **LLM knowledge** for reasoning, writing, and stable general knowledge
+
+## Recommended Routing Principle
+
+**Ground first, reason second.**
+
+That means:
+
+* prefer documents when the question is about provided material
+* prefer web search when freshness matters
+* prefer calculator when exact math is needed
+* otherwise let the LLM answer naturally
+
+## Prompt Changes for Stronger Restriction
+
+If stricter control is needed, do not remove LLM knowledge entirely. Instead, make the routing more explicit in the prompts.
+
+### 1. Update `SYSTEM_PROMPT`
+
+```python
+SYSTEM_PROMPT = """You are Aria, an intelligent AI assistant.
+
+Your goal is to answer using the most reliable source available in this order:
+1. Uploaded document context, when relevant
+2. Web search, when the question needs current or real-world information
+3. Calculator, when exact computation is needed
+4. Built-in model knowledge, only when the question is general, stable, and does not require documents, live data, or exact calculation
+
+Rules:
+- If the user’s question is about uploaded files, prefer document context and cite it.
+- If the answer may depend on recent or changing information, use web_search.
+- If the query involves arithmetic or formulas, use calculator.
+- Use built-in knowledge only for stable general knowledge, explanations, rewriting, summarization, brainstorming, or conversational help.
+- Do not present built-in knowledge as document-backed or live-verified information.
+- When documents are incomplete, say so briefly, then supplement with web search or built-in knowledge as appropriate.
+"""
+```
+
+### 2. Update `RAG_CONTEXT_TEMPLATE`
+
+```python
+RAG_CONTEXT_TEMPLATE = """Here is relevant content from the user's uploaded documents:
+
+{context}
+
+User's question: {question}
+
+Answer using the document content first and cite sources as (filename, page N).
+If the document only partially answers the question, clearly separate:
+1. what is supported by the document
+2. what is supplemented from web search or general model knowledge
+
+Use web search if freshness or real-world verification is needed.
+Use general model knowledge only for stable background explanation when documents do not fully cover the topic.
+"""
+```
+
+### 3. Update `VALIDATOR_PROMPT`
+
+```python
+VALIDATOR_PROMPT = """Evaluate this AI assistant response.
+
+Question: {question}
+Response: {response}
+
+Return JSON only:
+{{
+  "confidence": "high|medium|low|unverified",
+  "issues": [],
+  "should_search_web": false,
+  "used_unsupported_llm_knowledge": false,
+  "verdict": "one sentence assessment"
+}}
+
+Mark used_unsupported_llm_knowledge as true if:
+- the response claims document support without citation
+- the response answers a current-events question without web search
+- the response uses model knowledge where exact tools should have been used
+- the response presents uncertain knowledge as verified fact
+"""
+```
+
+## Final Recommendation
+
+Do not fully block the LLM from using its own knowledge. Instead, make the routing policy explicit and prioritize the best source for each task. This gives better accuracy, better user experience, and better tool efficiency.
