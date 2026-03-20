@@ -27,7 +27,7 @@ Realtime notify when document uploading
 
 ```bash
 # 1. Clone and set up
-git clone https://github.com/Rohitkumarsony/Aria.git
+git clone https://github.com/Rohitkumarsony/aria.git
 cd aria
 python -m venv venv && source venv/bin/activate
 
