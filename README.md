@@ -379,18 +379,13 @@ Without it, every question injects whatever ChromaDB returns regardless of relev
 **Safe AST calculator vs eval()**
 Python eval() would execute arbitrary code. The AST walker only permits whitelisted node types. `__import__('os').system('rm -rf /')` is rejected at parse time.
 
-
-
-
-
-
 ---
 ## Note ##
 # Intent-Based Routing Model for Assistant Responses
 
 This document describes how the assistant decides when to use uploaded document context, web search, calculator tools, or built-in LLM knowledge.
 
-## Client-Facing Model Summary
+## Chatbot Summary
 
 Our assistant follows an intent-first response model. It first checks whether the user's query can be answered from uploaded documents; if relevant document context exists, it answers from that context with citations. If the document context is missing, incomplete, or not sufficient for a reliable answer, it decides whether external freshness is required. For queries involving current or changing information such as news, weather, sports, prices, public figures, schedules, or recent events, it invokes web search. For numerical computation, formulas, percentages, interest, conversions, or explicit math expressions, it invokes the calculator tool. For conversational queries, explanations, rewriting, summarization, brainstorming, or stable general knowledge that does not require live verification, it answers directly using the language model’s built-in knowledge. This design avoids unnecessary tool calls, keeps responses natural, and uses tools only when they improve accuracy, freshness, or precision.
 
