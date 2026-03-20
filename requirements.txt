@@ -1,0 +1,30 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+pydantic==2.8.2
+pydantic-settings==2.4.0
+
+# LLM + Agent
+openai==1.45.0
+langchain==0.3.0
+langchain-openai==0.2.0
+langchain-community==0.3.0
+langgraph==0.2.28
+
+# RAG
+chromadb
+httpx
+pypdf==4.3.1
+rank-bm25==0.2.2
+
+# OCR
+pytesseract==0.3.13
+pdf2image==1.17.0
+Pillow==10.4.0
+
+# Search (ZenSerp + DuckDuckGo fallback)
+httpx==0.27.2
+duckduckgo-search==6.2.6
+
+python-dotenv==1.0.1
+aiofiles==24.1.0

@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Aria AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f0f;--bg2:#171717;--bg3:#1e1e1e;--bg4:#262626;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);
+  --accent:#10a37f;--accent2:#1a7f64;
+  --red:#ef4444;--amber:#f59e0b;--blue:#3b82f6;--green:#10b981;
+  --text:#ececec;--muted:#8e8e8e;--muted2:#b4b4b4;
+  --font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+  --sidebar:260px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;overflow:hidden}
+.app{display:flex;height:100vh}
+
+/* Sidebar */
+.sidebar{width:var(--sidebar);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden}
+.sidebar-top{padding:12px;border-bottom:1px solid var(--border)}
+.btn-new{display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border-radius:8px;background:transparent;border:1px solid var(--border2);color:var(--text);font-family:var(--font);font-size:13px;cursor:pointer;transition:background .15s}
+.btn-new:hover{background:var(--bg3)}
+.btn-new:disabled{opacity:.4;cursor:not-allowed}
+.btn-new svg{width:16px;height:16px;flex-shrink:0}
+.sidebar-label{padding:12px 14px 6px;font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.sessions-list{flex:1;overflow-y:auto;padding:4px 8px}
+.sessions-list::-webkit-scrollbar{width:3px}
+.sessions-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+.session-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .15s;margin-bottom:2px}
+.session-item:hover{background:var(--bg3)}
+.session-item.active{background:var(--bg4)}
+.session-title{flex:1;font-size:13px;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.session-item.active .session-title{color:var(--text)}
+.session-del{width:18px;height:18px;border-radius:4px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:none;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.session-item:hover .session-del{display:flex}
+.session-del:hover{color:var(--red)}
+.sidebar-footer{padding:12px;border-top:1px solid var(--border)}
+.ws-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.ws-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s}
+.ws-dot.on{background:var(--green)}
+.ws-dot.err{background:var(--red)}
+
+/* Main */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.topbar{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0}
+.topbar-title{font-size:15px;font-weight:500;flex:1}
+.chunks-pill{font-size:11px;font-family:var(--mono);padding:3px 9px;border-radius:10px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)}
+.conf-pill{font-size:11px;padding:3px 9px;border-radius:10px;border:1px solid var(--border);display:none}
+.conf-pill.show{display:inline-flex;align-items:center;gap:4px}
+.conf-pill.high{background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);color:var(--green)}
+.conf-pill.medium{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.3);color:var(--amber)}
+.conf-pill.low,.conf-pill.unverified{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.3);color:var(--red)}
+
+/* Messages */
+.messages{flex:1;overflow-y:auto;padding:0;display:flex;flex-direction:column}
+.messages::-webkit-scrollbar{width:4px}
+.messages::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+.welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px;text-align:center}
+.welcome-logo{width:52px;height:52px;border-radius:14px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:4px}
+.welcome-title{font-size:26px;font-weight:600;letter-spacing:-.5px}
+.welcome-sub{font-size:14px;color:var(--muted);max-width:400px;line-height:1.7}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:6px}
+.chip{padding:7px 15px;border-radius:20px;border:1px solid var(--border2);background:var(--bg2);font-size:13px;color:var(--muted2);cursor:pointer;transition:all .2s}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+
+.msg-row{width:100%;padding:18px 0;border-bottom:1px solid var(--border)}
+.msg-row.user{background:var(--bg)}
+.msg-row.assistant{background:var(--bg2)}
+.msg-inner{max-width:720px;margin:0 auto;padding:0 24px;display:flex;gap:16px;align-items:flex-start}
+.msg-avatar{width:30px;height:30px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;margin-top:2px}
+.msg-row.user .msg-avatar{background:var(--accent);color:#fff}
+.msg-row.assistant .msg-avatar{background:var(--bg4);border:1px solid var(--border2);color:var(--text)}
+.msg-body{flex:1;min-width:0;font-size:15px;line-height:1.75}
+.msg-body p{margin:6px 0}
+.msg-body strong{font-weight:600}
+.msg-body em{color:var(--muted2);font-style:italic}
+.msg-body code{font-family:var(--mono);font-size:13px;background:var(--bg4);padding:1px 5px;border-radius:4px;color:#e2a97e}
+.msg-body pre{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin:10px 0;overflow-x:auto}
+.msg-body pre code{background:none;padding:0;color:#7dd3a8;font-size:13px}
+.msg-body ul,.msg-body ol{padding-left:20px;margin:6px 0}
+.msg-body li{margin:3px 0}
+.msg-body a{color:var(--accent);text-decoration:none}
+.msg-body a:hover{text-decoration:underline}
+.msg-body blockquote{border-left:3px solid var(--accent);padding-left:14px;margin:8px 0;color:var(--muted2)}
+.msg-body h1,.msg-body h2,.msg-body h3{font-weight:600;margin:12px 0 6px}
+.msg-body table{border-collapse:collapse;width:100%;margin:10px 0;font-size:14px}
+.msg-body th,.msg-body td{border:1px solid var(--border2);padding:7px 12px;text-align:left}
+.msg-body th{background:var(--bg3);font-weight:500}
+.msg-body hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+
+.typing{display:flex;align-items:center;gap:5px;padding:4px 0}
+.typing span{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:bounce 1.2s infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+
+/* Input */
+.input-area{padding:16px 0 20px;flex-shrink:0;background:var(--bg)}
+.input-outer{max-width:720px;margin:0 auto;padding:0 24px}
+.input-box{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;transition:border-color .2s;position:relative}
+.input-box:focus-within{border-color:rgba(16,163,127,.5)}
+.input-box.locked{opacity:.6;pointer-events:none}
+.upload-strip{display:none;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px}
+.upload-strip.show{display:flex}
+.upload-file-name{flex:1;color:var(--muted2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.upload-remove{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px}
+.upload-remove:hover{color:var(--red)}
+.upload-progress{display:none;padding:8px 12px;border-bottom:1px solid var(--border)}
+.upload-progress.show{display:block}
+.up-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;font-size:12px}
+.up-stage{color:var(--muted2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.up-pct{color:var(--accent);font-family:var(--mono);font-weight:500;margin-left:8px}
+.up-bar{height:3px;background:var(--bg4);border-radius:4px;overflow:hidden;margin-bottom:5px}
+.up-fill{height:100%;width:0%;background:var(--accent);border-radius:4px;transition:width .35s ease}
+.up-pages{display:flex;flex-wrap:wrap;gap:3px}
+.up-page{width:22px;height:18px;border-radius:4px;background:var(--bg4);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:9px;font-family:var(--mono);color:var(--muted);transition:all .2s}
+.up-page.done{background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.4);color:var(--green)}
+.up-page.ocr{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.4);color:var(--amber)}
+.up-page.active{background:rgba(16,163,127,.2);border-color:var(--accent);color:var(--accent);animation:pulse 1s infinite}
+.input-row{display:flex;align-items:flex-end;gap:0;padding:10px 12px}
+.attach-btn{width:34px;height:34px;border-radius:8px;border:none;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color .2s;flex-shrink:0;position:relative}
+.attach-btn:hover{color:var(--text)}
+.attach-btn input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+#msg-input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:var(--font);font-size:14px;line-height:1.5;resize:none;max-height:200px;overflow-y:auto;padding:6px 8px}
+#msg-input::placeholder{color:var(--muted)}
+.send-btn{width:34px;height:34px;border-radius:9px;flex-shrink:0;background:var(--accent);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:opacity .2s,transform .1s}
+.send-btn:hover{opacity:.85}
+.send-btn:active{transform:scale(.93)}
+.send-btn:disabled{opacity:.3;cursor:not-allowed;transform:none}
+.send-btn svg{width:15px;height:15px;fill:#fff}
+.input-hint{font-size:11px;color:var(--muted);text-align:center;margin-top:8px}
+.lock-notice{display:none;font-size:12px;color:var(--amber);text-align:center;margin-top:6px}
+.lock-notice.show{display:block}
+.input-row{display:flex;align-items:flex-end;gap:0;padding:10px 12px;transition:opacity .3s}
+.input-row.hidden{display:none}
+
+.toast{position:fixed;bottom:20px;right:20px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:10px 16px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transform:translateY(8px);transition:all .3s;pointer-events:none;max-width:300px}
+.toast.show{opacity:1;transform:none}
+.toast.ok{border-color:rgba(16,185,129,.4);color:var(--green)}
+.toast.err{border-color:rgba(239,68,68,.4);color:var(--red)}
+.toast.warn{border-color:rgba(245,158,11,.4);color:var(--amber)}
+
+@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.animate-in{animation:fadeIn .2s ease}
+@media(max-width:640px){.sidebar{display:none}.msg-inner{padding:0 14px}}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-top">
+    <button class="btn-new" id="btn-new" onclick="newChat()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      New chat
+    </button>
+  </div>
+  <div class="sidebar-label">Recent</div>
+  <div class="sessions-list" id="sessions-list">
+    <div style="font-size:12px;color:var(--muted);padding:8px 10px">No chats yet</div>
+  </div>
+  <div class="sidebar-footer">
+    <div class="ws-row">
+      <div class="ws-dot" id="ws-dot"></div>
+      <span id="ws-label">Connecting…</span>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <span class="topbar-title" id="topbar-title">Aria</span>
+    <span class="chunks-pill" id="chunks-pill">0 chunks</span>
+    <span class="conf-pill" id="conf-pill"></span>
+  </div>
+
+  <div class="messages" id="messages">
+    <div class="welcome" id="welcome">
+      <div class="welcome-logo">✦</div>
+      <div class="welcome-title">How can I help you?</div>
+      <div class="welcome-sub">Upload a document, search the web, run calculations, or just chat.</div>
+      <div class="chips">
+        <div class="chip" onclick="quickSend('What\'s in the news today?')">Today's news</div>
+        <div class="chip" onclick="quickSend('Who is the current US president?')">US president</div>
+        <div class="chip" onclick="quickSend('Calculate 15% tip on ₹2400')">Calculate tip</div>
+        <div class="chip" onclick="quickSend('Summarise the uploaded document')">Summarise doc</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="input-area">
+    <div class="input-outer">
+      <div class="input-box" id="input-box">
+        <div class="upload-strip" id="upload-strip">
+          <span>📎</span>
+          <span class="upload-file-name" id="upload-file-name">file.pdf</span>
+          <button class="upload-remove" onclick="clearFile()" title="Remove">✕</button>
+        </div>
+        <div class="upload-progress" id="up-prog">
+          <div class="up-header">
+            <span class="up-stage" id="up-stage">Processing…</span>
+            <span class="up-pct" id="up-pct">0%</span>
+          </div>
+          <div class="up-bar"><div class="up-fill" id="up-fill"></div></div>
+          <div class="up-pages" id="up-pages"></div>
+        </div>
+        <div class="input-row">
+          <button class="attach-btn" title="Attach PDF or TXT">
+            <input type="file" id="file-input" accept=".pdf,.txt" onchange="fileSelected(event)"/>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+            </svg>
+          </button>
+          <textarea id="msg-input" rows="1" placeholder="Message Aria…"></textarea>
+          <button class="send-btn" id="send-btn" disabled onclick="sendMessage()">
+            <svg viewBox="0 0 24 24"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="input-hint" id="input-hint">Enter to send · Shift+Enter for new line · 📎 to attach</div>
+      <div class="lock-notice" id="lock-notice">⏳ Processing document — chat unlocks when done</div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+// ── Session persistence ───────────────────────────────────────────────────────
+const SESSION_KEY = 'aria_session_id';
+const getSavedSession = () => localStorage.getItem(SESSION_KEY);
+const saveSession = id => localStorage.setItem(SESSION_KEY, id);
+
+let sessionId   = getSavedSession() || crypto.randomUUID();
+saveSession(sessionId);
+
+// ONE persistent WebSocket — never closed/reopened on session switch
+let ws          = null;
+let isThinking  = false;
+let isUploading = false;
+let pendingFile = null;
+let allSessions = [];
+
+const $ = id => document.getElementById(id);
+const messagesEl  = $('messages');
+const msgInput    = $('msg-input');
+const sendBtn     = $('send-btn');
+const btnNew      = $('btn-new');
+const inputBox    = $('input-box');
+const wsDot       = $('ws-dot');
+const wsLabel     = $('ws-label');
+const chunksPill  = $('chunks-pill');
+const confPill    = $('conf-pill');
+const sessionList = $('sessions-list');
+const topbarTitle = $('topbar-title');
+const lockNotice  = $('lock-notice');
+const inputHint   = $('input-hint');
+const uploadStrip = $('upload-strip');
+const upProg      = $('up-prog');
+const upStage     = $('up-stage');
+const upPct       = $('up-pct');
+const upFill      = $('up-fill');
+const upPages     = $('up-pages');
+
+// ── WebSocket ────────────────────────────────────────────────────────────────
+function connect() {
+  // Connect once to a stable /ws/main endpoint — session_id sent in messages
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws/main`);
+
+  ws.onopen = () => {
+    wsDot.className = 'ws-dot on';
+    wsLabel.textContent = 'Connected';
+    sendBtn.disabled = false;
+    ws.send(JSON.stringify({type:'status'}));
+    ws.send(JSON.stringify({type:'sessions_list'}));
+    ws.send(JSON.stringify({type:'session_load', session_id: sessionId}));
+    clearInterval(ws._ping);
+    ws._ping = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({type:'ping'}));
+    }, 20000);
+  };
+
+  ws.onclose = () => {
+    wsDot.className = 'ws-dot err';
+    wsLabel.textContent = 'Reconnecting…';
+    sendBtn.disabled = true;
+    clearInterval(ws._ping);
+    // Only reconnect if not deliberately switching — exponential backoff
+    setTimeout(connect, 3000);
+  };
+
+  ws.onerror = () => { wsDot.className = 'ws-dot err'; };
+
+  ws.onmessage = e => {
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    onEvent(m);
+  };
+}
+
+// Helper — send a WS message, waiting for connection if needed
+function wsSend(payload) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(payload));
+  }
+}
+
+// ── Events ───────────────────────────────────────────────────────────────────
+function onEvent(m) {
+  switch(m.event) {
+    case 'pong': break;
+
+    case 'status':
+      chunksPill.textContent = (m.total_chunks||0) + ' chunks';
+      break;
+
+    case 'sessions_list':
+      allSessions = m.sessions || [];
+      renderSessions();
+      break;
+
+    case 'session_history':
+      loadHistory(m.messages || []);
+      break;
+
+    case 'session_deleted':
+      allSessions = allSessions.filter(s => s.session_id !== m.session_id);
+      renderSessions();
+      break;
+
+    case 'searching_web':
+      msgInput.placeholder = '🔍 Searching: ' + (m.query || '…');
+      const tr = $('typing-row');
+      if (tr) tr.querySelector('.msg-body').innerHTML =
+        '<span style="font-size:13px;color:var(--blue)">🔍 Searching the web<span class="typing" style="display:inline-flex;margin-left:6px"><span></span><span></span><span></span></span></span>';
+      break;
+
+    case 'chat_token':
+      appendToken(m.token);
+      break;
+
+    case 'chat_done':
+      finishChat(m.confidence, m.verdict);
+      wsSend({type:'sessions_list'});
+      break;
+
+    case 'chat_error':
+      finishChat('low','');
+      showToast(m.detail||'Error','err');
+      break;
+
+    case 'upload_start':
+      isUploading = true;
+      setUploadingState(true);
+      uploadStrip.className = 'upload-strip';
+      upProg.className = 'upload-progress show';
+      upStage.textContent = m.message||'Processing…';
+      upPct.textContent = '0%'; upFill.style.width = '0%';
+      upPages.innerHTML = '';
+      if (m.total_pages > 1) {
+        for (let i=1;i<=m.total_pages;i++){
+          const p = document.createElement('div');
+          p.className='up-page'; p.id=`p${i}`; p.textContent=i;
+          upPages.appendChild(p);
+        }
+      }
+      break;
+
+    case 'page_done': {
+      const pill = $(`p${m.page}`);
+      if (pill) pill.className = 'up-page '+(m.used_ocr?'ocr':'done');
+      const next = $(`p${m.page+1}`);
+      if (next) next.className = 'up-page active';
+      upFill.style.width = m.pct+'%';
+      upPct.textContent = m.pct+'%';
+      upStage.textContent = `Page ${m.page}/${m.total_pages}${m.used_ocr?' (OCR)':''}`;
+      break;
+    }
+
+    case 'upload_complete':
+      isUploading = false;
+      chunksPill.textContent = m.total_chunks + ' chunks';
+      upFill.style.width = '100%'; upPct.textContent = '100%';
+      upStage.textContent = `✓ ${m.total_chunks} chunks ready`;
+      setUploadingState(false);
+      msgInput.placeholder = 'Ask a question about the document…';
+      showToast(`"${m.filename}" ready — ask your questions!`, 'ok');
+      setTimeout(() => { upProg.className = 'upload-progress'; upPages.innerHTML=''; }, 4000);
+      break;
+
+    case 'upload_error':
+      isUploading = false;
+      setUploadingState(false);
+      upProg.className = 'upload-progress';
+      msgInput.placeholder = 'Message Aria…';
+      showToast(m.detail||'Upload failed','err');
+      appendSystemMsg('⚠ ' + (m.detail||'Upload failed'));
+      break;
+  }
+}
+
+// ── Upload state — locks everything including New Chat ───────────────────────
+function setUploadingState(uploading) {
+  const inputRow = document.querySelector('.input-row');
+  if (uploading) {
+    // Hide input row completely during upload
+    if (inputRow) inputRow.className = 'input-row hidden';
+    inputHint.style.display = 'none';
+    lockNotice.className = 'lock-notice show';
+  } else {
+    // Show input row after upload completes
+    if (inputRow) inputRow.className = 'input-row';
+    inputHint.style.display = '';
+    lockNotice.className = 'lock-notice';
+  }
+  inputBox.className = 'input-box' + (uploading ? ' locked' : '');
+  sendBtn.disabled   = uploading || isThinking;
+  btnNew.disabled    = uploading;
+}
+
+// ── Send ─────────────────────────────────────────────────────────────────────
+function sendMessage() {
+  const text = msgInput.value.trim();
+  if (!text && !pendingFile) return;
+  if (isThinking || isUploading || !ws || ws.readyState!==1) return;
+
+  if (pendingFile) {
+    wsSend({type:'upload', session_id: sessionId, filename:pendingFile.name, data:pendingFile.b64});
+    clearFile();
+    if (!text) return;
+  }
+
+  if (!text) return;
+  isThinking = true;
+  sendBtn.disabled = true;
+  btnNew.disabled  = true;   // disable new chat while thinking
+  msgInput.value = ''; msgInput.style.height = 'auto';
+  confPill.className = 'conf-pill';
+
+  appendUserMsg(text);
+  showTyping();
+  // Include session_id in every chat message — server routes by this
+  wsSend({type:'chat', session_id: sessionId, message:text});
+}
+
+function quickSend(text) { msgInput.value = text; sendMessage(); }
+
+// ── File ──────────────────────────────────────────────────────────────────────
+function fileSelected(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['pdf','txt'].includes(ext)) { showToast('Only PDF and TXT supported','err'); return; }
+  if (file.size > 20*1024*1024) { showToast('File exceeds 20 MB','err'); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    pendingFile = {name:file.name, b64:reader.result.split(',')[1]};
+    $('upload-file-name').textContent = file.name;
+    uploadStrip.className = 'upload-strip show';
+    msgInput.placeholder = 'Add a message or press Enter to upload…';
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+function clearFile() {
+  pendingFile = null;
+  uploadStrip.className = 'upload-strip';
+  msgInput.placeholder = 'Message Aria…';
+}
+
+// ── Messages ──────────────────────────────────────────────────────────────────
+function appendUserMsg(text) {
+  $('welcome')?.remove();
+  const row = document.createElement('div');
+  row.className = 'msg-row user animate-in';
+  row.innerHTML = `<div class="msg-inner"><div class="msg-avatar">U</div><div class="msg-body">${marked.parse(text)}</div></div>`;
+  messagesEl.appendChild(row);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+function appendSystemMsg(text) {
+  const row = document.createElement('div');
+  row.className = 'msg-row assistant animate-in';
+  row.innerHTML = `<div class="msg-inner"><div class="msg-avatar">✦</div><div class="msg-body" style="color:var(--amber)">${text}</div></div>`;
+  messagesEl.appendChild(row);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+let _curRow=null,_curBody=null,_curRaw='',_curText=null;
+
+function showTyping() {
+  $('welcome')?.remove();
+  $('typing-row')?.remove();
+  const row = document.createElement('div');
+  row.id='typing-row'; row.className='msg-row assistant';
+  row.innerHTML=`<div class="msg-inner"><div class="msg-avatar">✦</div><div class="msg-body"><div class="typing"><span></span><span></span><span></span></div></div></div>`;
+  messagesEl.appendChild(row);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function appendToken(token) {
+  $('typing-row')?.remove();
+  if (!_curRow) {
+    $('welcome')?.remove();
+    _curRow = document.createElement('div');
+    _curRow.className = 'msg-row assistant animate-in';
+    _curBody = document.createElement('div');
+    _curBody.className = 'msg-body';
+    _curText = document.createElement('pre');
+    _curText.style.cssText = 'white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:inherit;background:none;border:none;padding:0;margin:0;color:inherit';
+    _curBody.appendChild(_curText);
+    const inner = document.createElement('div');
+    inner.className = 'msg-inner';
+    inner.innerHTML = '<div class="msg-avatar">✦</div>';
+    inner.appendChild(_curBody);
+    _curRow.appendChild(inner);
+    messagesEl.appendChild(_curRow);
+    _curRaw = '';
+  }
+  _curRaw += token;
+  _curText.textContent = _curRaw;
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function finishChat(confidence, verdict) {
+  if (_curBody && _curRaw) _curBody.innerHTML = marked.parse(_curRaw);
+  _curRow=null; _curBody=null; _curRaw=''; _curText=null;
+  isThinking = false;
+  sendBtn.disabled = false;
+  btnNew.disabled  = false;  // re-enable new chat
+  msgInput.placeholder = 'Message Aria…';
+  if (confidence) {
+    const labels = {high:'✓ High confidence',medium:'~ Medium confidence',low:'⚠ Low confidence',unverified:'⚠ Unverified'};
+    confPill.textContent = labels[confidence]||confidence;
+    confPill.className = `conf-pill show ${confidence}`;
+    confPill.title = verdict||'';
+  }
+}
+
+function loadHistory(messages) {
+  messagesEl.innerHTML = '';
+  if (!messages.length) {
+    messagesEl.innerHTML = `<div class="welcome" id="welcome"><div class="welcome-logo">✦</div><div class="welcome-title">How can I help you?</div><div class="welcome-sub">Upload a document, search the web, run calculations, or just chat.</div><div class="chips"><div class="chip" onclick="quickSend('What\\'s in the news today?')">Today's news</div><div class="chip" onclick="quickSend('Who is the current US president?')">US president</div><div class="chip" onclick="quickSend('Calculate 15% tip on ₹2400')">Calculate tip</div><div class="chip" onclick="quickSend('Summarise the uploaded document')">Summarise doc</div></div></div>`;
+    return;
+  }
+  for (const m of messages) {
+    const row = document.createElement('div');
+    row.className = `msg-row ${m.role} animate-in`;
+    const avatar = m.role==='user' ? 'U' : '✦';
+    row.innerHTML = `<div class="msg-inner"><div class="msg-avatar">${avatar}</div><div class="msg-body">${marked.parse(m.content)}</div></div>`;
+    messagesEl.appendChild(row);
+  }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+// ── Sessions ──────────────────────────────────────────────────────────────────
+function renderSessions() {
+  if (!allSessions.length) {
+    sessionList.innerHTML = `<div style="font-size:12px;color:var(--muted);padding:8px 10px">No chats yet</div>`;
+    return;
+  }
+  sessionList.innerHTML = allSessions.map(s => `
+    <div class="session-item ${s.session_id===sessionId?'active':''}" onclick="switchSession('${s.session_id}')">
+      <span class="session-title">${escHtml(s.title)}</span>
+      <button class="session-del" onclick="delSession(event,'${s.session_id}')" title="Delete">✕</button>
+    </div>`).join('');
+}
+
+function switchSession(sid) {
+  if (sid === sessionId) return;
+  sessionId = sid;
+  saveSession(sid);
+  topbarTitle.textContent = 'Aria';
+  confPill.className = 'conf-pill';
+  renderSessions();
+  // No reconnect — just tell server to switch session context
+  wsSend({type:'session_load', session_id: sid});
+}
+
+function newChat() {
+  if (isUploading || isThinking) return;
+  sessionId = crypto.randomUUID();
+  saveSession(sessionId);
+  topbarTitle.textContent = 'Aria';
+  confPill.className = 'conf-pill';
+  messagesEl.innerHTML = `<div class="welcome" id="welcome"><div class="welcome-logo">✦</div><div class="welcome-title">How can I help you?</div><div class="welcome-sub">Upload a document, search the web, run calculations, or just chat.</div></div>`;
+  // No reconnect — new session UUID is now used in subsequent messages
+  renderSessions();
+}
+
+function delSession(e, sid) {
+  e.stopPropagation();
+  wsSend({type:'session_delete', session_id:sid});
+  if (sid === sessionId) {
+    sessionId = crypto.randomUUID();
+    saveSession(sessionId);
+    messagesEl.innerHTML = `<div class="welcome" id="welcome"><div class="welcome-logo">✦</div><div class="welcome-title">How can I help you?</div></div>`;
+    renderSessions();
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function showToast(txt, type='') {
+  const t=$('toast'); t.textContent=txt; t.className=`toast show ${type}`;
+  setTimeout(()=>t.className='toast',4000);
+}
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+msgInput.addEventListener('input', () => {
+  msgInput.style.height='auto';
+  msgInput.style.height=Math.min(msgInput.scrollHeight,200)+'px';
+});
+msgInput.addEventListener('keydown', e => {
+  if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+connect();
+</script>
+</body>
+</html>
